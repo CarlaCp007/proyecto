@@ -2,16 +2,26 @@ import pygame
 import sys
 from pygame.locals import *
 import random
+import os
 
 ANCHO = 500
 ALTO = 400
 FPS = 30
 NEGRO = (0, 0, 0)
 
+def resource_path(relative_path):
+    """Obtiene la ruta absoluta al recurso, funciona para desarrollo y para PyInstaller."""
+    try:
+        # PyInstaller crea un atributo _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 class Fondo:
     def __init__(self, image_path, velocidad):
         try:
-            self.fondo = pygame.image.load(image_path).convert()
+            self.fondo = pygame.image.load(resource_path(image_path)).convert()
         except pygame.error as e:
             print(f"Error al cargar el fondo: {e}")
             pygame.quit()
@@ -20,13 +30,12 @@ class Fondo:
         self.speed = velocidad
 
 class Player(pygame.sprite.Sprite):
-    # Sprite del jugador
-    def __init__(self):
-        # Heredamos el init de la clase Sprite de Pygame
+    """Sprite del jugador"""
+    def __init__(self, image_path):
         super().__init__()
         # Jugador
         try:
-            self.image = pygame.image.load('imagenes/oveja1.png').convert()
+            self.image = pygame.image.load(resource_path(image_path)).convert()
             self.image.set_colorkey(NEGRO)  # Hace transparente el fondo negro de la imagen
         except pygame.error as e:
             print(f"Error al cargar la imagen del jugador: {e}")
@@ -41,12 +50,9 @@ class Player(pygame.sprite.Sprite):
         self.velocidad_x = 0
         self.velocidad_y = 0
 
-        # Crear instancias de fondo y jugador (si es necesario)
-        # self.fondo = Fondo("imagenes/fondo.png", velocidad=5)
-
     def update(self):
         # Actualiza esto cada vuelta de bucle.
-        self.rect.x += 1
+        # self.rect.x += 1  # Movimiento automático, opcional
         if self.rect.top > ALTO:
             self.rect.bottom = 0
         
@@ -59,16 +65,16 @@ class Player(pygame.sprite.Sprite):
 
         # Mueve el personaje hacia la izquierda
         if teclas[pygame.K_a]:
-            self.velocidad_x = -10
+            self.velocidad_x = -5
         # Mueve el personaje hacia la derecha
         if teclas[pygame.K_d]:
-            self.velocidad_x = 10
+            self.velocidad_x = 5
         # Mueve el personaje hacia arriba
         if teclas[pygame.K_w]:
-            self.velocidad_y = -10
+            self.velocidad_y = -5
         # Mueve el personaje hacia abajo
         if teclas[pygame.K_s]:
-            self.velocidad_y = 10
+            self.velocidad_y = 5
 
         # Actualiza la velocidad del personaje
         self.rect.x += self.velocidad_x
@@ -89,10 +95,10 @@ class Player(pygame.sprite.Sprite):
         if self.rect.top < 0:
             self.rect.top = 0
 
-    def load_images(self):
-        # Cargar imágenes necesarias
+    def load_images(self, image_path):
+        """Cargar imágenes necesarias"""
         try:
-            self.icono = pygame.image.load("imagenes/oveja.png").convert_alpha()
+            self.icono = pygame.image.load(resource_path(image_path)).convert_alpha()
             pygame.display.set_icon(self.icono)
         except pygame.error as e:
             print(f"Error al cargar imágenes: {e}")
@@ -100,23 +106,32 @@ class Player(pygame.sprite.Sprite):
             sys.exit()
 
 class Enemigos(pygame.sprite.Sprite):
-    # Sprite del jugador
-    def __init__(self):
-        # Heredamos el init de la clase Sprite de Pygame
+    """Sprite de los enemigos"""
+    def __init__(self, image_path):
         super().__init__()
-        # Jugador
+        # Enemigo
         try:
-            self.image = pygame.image.load('imagenes/aguila.png').convert()
+            self.image = pygame.image.load(resource_path(image_path)).convert()
             self.image.set_colorkey(NEGRO)  # Hace transparente el fondo negro de la imagen
         except pygame.error as e:
-            print(f"Error al cargar la imagen del jugador: {e}")
+            print(f"Error al cargar la imagen del enemigo: {e}")
             pygame.quit()
             sys.exit()
         # Obtiene el rectángulo (sprite)
         self.rect = self.image.get_rect()
-        #Ubicación aleatoria para el sprite
+        # Ubicación aleatoria para el sprite
         self.rect.x = random.randrange(ANCHO - self.rect.width)
-        self.rect.y = random.randrange(150)
+        self.rect.y = random.randrange(-100, -40)  # Comienza fuera de la pantalla
+        # Velocidad del enemigo
+        self.velocidad = random.randint(1, 5)
+
+    def update(self):
+        """Movimiento básico del enemigo"""
+        self.rect.y += self.velocidad
+        if self.rect.top > ALTO:
+            self.rect.x = random.randrange(ANCHO - self.rect.width)
+            self.rect.y = random.randrange(-100, -40)
+            self.velocidad = random.randint(1, 5)
 
 pygame.init()
 PANTALLA = pygame.display.set_mode((ANCHO, ALTO))
@@ -125,11 +140,21 @@ clock = pygame.time.Clock()
 
 # Grupo de sprites, instanciación del objeto jugador.
 sprites = pygame.sprite.Group()
-jugador = Player()
+jugador = Player('imagenes/oveja1.png')
 sprites.add(jugador)
 
-enemigo = Enemigos()
-sprites.add(enemigo)
+# Instanciación de enemigos
+enemigos = pygame.sprite.Group()
+for _ in range(5):  # Por ejemplo, 5 enemigos
+    enemigo = Enemigos('imagenes/aguila.png')
+    enemigos.add(enemigo)
+sprites.add(enemigos)
+
+# Opcional: Cargar el icono del juego
+jugador.load_images('imagenes/oveja.png')
+
+# Clase Fondo (opcional, si deseas agregar un fondo en movimiento)
+fondo = Fondo('imagenes/fondo.png', velocidad=5)
 
 while True:
     for event in pygame.event.get():
@@ -141,7 +166,10 @@ while True:
     sprites.update()
 
     # Dibujar en la pantalla
-    PANTALLA.fill(NEGRO)
+    if hasattr(fondo, 'fondo'):
+        PANTALLA.blit(fondo.fondo, (fondo.x, 0))  # Dibujar el fondo
+    else:
+        PANTALLA.fill(NEGRO)
     sprites.draw(PANTALLA)
 
     pygame.display.flip()  # Actualiza la pantalla completa
